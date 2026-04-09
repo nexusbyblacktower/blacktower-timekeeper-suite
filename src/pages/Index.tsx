@@ -5,6 +5,7 @@ import TimeDifference from "@/components/TimeDifference";
 import WorldClocks from "@/components/WorldClocks";
 import TimestampFormats from "@/components/TimestampFormats";
 import EpochCountdown from "@/components/EpochCountdown";
+import PhotoProof from "@/components/PhotoProof";
 
 const Index = () => {
   return (
@@ -24,6 +25,7 @@ const Index = () => {
 
       {/* Main Grid */}
       <main className="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <PhotoProof />
         <LiveClock />
         <TimestampConverter />
         <TimeDifference />
