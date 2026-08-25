@@ -277,14 +277,9 @@ const PhotoProof = () => {
             </Button>
           )}
           {capturedImage && (
-            <>
-              <Button onClick={downloadPhoto} className="font-display tracking-wider text-xs">
-                <Download className="w-4 h-4 mr-2" /> DOWNLOAD
-              </Button>
-              <Button onClick={retake} variant="outline" className="font-display tracking-wider text-xs">
-                <RefreshCw className="w-4 h-4 mr-2" /> RETAKE
-              </Button>
-            </>
+            <Button onClick={retake} variant="outline" className="font-display tracking-wider text-xs">
+              <RefreshCw className="w-4 h-4 mr-2" /> RETAKE
+            </Button>
           )}
         </div>
 
