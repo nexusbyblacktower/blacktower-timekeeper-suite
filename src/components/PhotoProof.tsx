@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Camera, Download, RefreshCw, MapPin, Clock, Hash, X, FlipHorizontal } from "lucide-react";
+import { Camera, RefreshCw, MapPin, Clock, Hash, X, FlipHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -179,13 +179,6 @@ const PhotoProof = () => {
     stopCamera();
   }, [location, locationError, refNumber, stopCamera]);
 
-  const downloadPhoto = useCallback(() => {
-    if (!capturedImage) return;
-    const a = document.createElement("a");
-    a.href = capturedImage;
-    a.download = `BLACKTOWER_PROOF_${refNumber}.png`;
-    a.click();
-  }, [capturedImage, refNumber]);
 
   const retake = useCallback(() => {
     setCapturedImage(null);
@@ -277,14 +270,9 @@ const PhotoProof = () => {
             </Button>
           )}
           {capturedImage && (
-            <>
-              <Button onClick={downloadPhoto} className="font-display tracking-wider text-xs">
-                <Download className="w-4 h-4 mr-2" /> DOWNLOAD
-              </Button>
-              <Button onClick={retake} variant="outline" className="font-display tracking-wider text-xs">
-                <RefreshCw className="w-4 h-4 mr-2" /> RETAKE
-              </Button>
-            </>
+            <Button onClick={retake} variant="outline" className="font-display tracking-wider text-xs">
+              <RefreshCw className="w-4 h-4 mr-2" /> RETAKE
+            </Button>
           )}
         </div>
 
