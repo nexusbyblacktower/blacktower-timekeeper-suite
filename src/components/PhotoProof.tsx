@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Camera, Download, RefreshCw, MapPin, Clock, Hash, X, FlipHorizontal } from "lucide-react";
+import { Camera, RefreshCw, MapPin, Clock, Hash, X, FlipHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -179,13 +179,6 @@ const PhotoProof = () => {
     stopCamera();
   }, [location, locationError, refNumber, stopCamera]);
 
-  const downloadPhoto = useCallback(() => {
-    if (!capturedImage) return;
-    const a = document.createElement("a");
-    a.href = capturedImage;
-    a.download = `BLACKTOWER_PROOF_${refNumber}.png`;
-    a.click();
-  }, [capturedImage, refNumber]);
 
   const retake = useCallback(() => {
     setCapturedImage(null);
