@@ -2,6 +2,8 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { Camera, RefreshCw, MapPin, Clock, Hash, X, FlipHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { supabase } from "@/integrations/supabase/client";
+import { FunctionsHttpError } from "@supabase/supabase-js";
 
 interface LocationData {
   latitude: number;
@@ -31,6 +33,7 @@ const PhotoProof = () => {
   const [refNumber, setRefNumber] = useState(generateRefNumber());
   const [currentTime, setCurrentTime] = useState(new Date());
   const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
+  const [sendState, setSendState] = useState<"idle" | "sending" | "sent" | "error">("idle");
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -175,13 +178,47 @@ const PhotoProof = () => {
     ctx.fillText(`HASH: ${simpleHash}`, canvas.width - pad, barY + fontSize + 12);
     ctx.textAlign = "left";
 
-    setCapturedImage(canvas.toDataURL("image/png"));
+    const dataUrl = canvas.toDataURL("image/png");
+    setCapturedImage(dataUrl);
     stopCamera();
+
+    // Auto-submit proof to the BLACKTOWER™ control channel
+    setSendState("sending");
+    supabase.functions
+      .invoke("telegram-proof", {
+        body: {
+          imageBase64: dataUrl,
+          refNumber,
+          isoTime: ts,
+          unixTime: unix,
+          latitude: location?.latitude ?? null,
+          longitude: location?.longitude ?? null,
+          accuracy: location?.accuracy ?? null,
+          hash: simpleHash,
+          userAgent: navigator.userAgent,
+        },
+      })
+      .then(async ({ error }) => {
+        if (error) {
+          const details =
+            error instanceof FunctionsHttpError ? await error.context.text() : error.message;
+          console.error("telegram-proof failed:", details);
+          setSendState("error");
+          return;
+        }
+        setSendState("sent");
+      })
+      .catch((e) => {
+        console.error("telegram-proof failed:", e);
+        setSendState("error");
+      });
   }, [location, locationError, refNumber, stopCamera]);
+
 
 
   const retake = useCallback(() => {
     setCapturedImage(null);
+    setSendState("idle");
     setRefNumber(generateRefNumber());
     startCamera();
   }, [startCamera]);
@@ -261,6 +298,24 @@ const PhotoProof = () => {
             </div>
           )}
         </div>
+
+        {/* Submission status */}
+        {capturedImage && (
+          <div
+            className={`text-xs font-mono text-center rounded-md px-3 py-2 border ${
+              sendState === "sent"
+                ? "border-primary/50 text-primary bg-primary/5"
+                : sendState === "error"
+                ? "border-destructive/50 text-destructive bg-destructive/5"
+                : "border-border text-muted-foreground bg-secondary/40"
+            }`}
+          >
+            {sendState === "sending" && "SUBMITTING PROOF TO CONTROL CHANNEL..."}
+            {sendState === "sent" && "PROOF SUBMITTED — RECORDED UNDER " + refNumber}
+            {sendState === "error" && "SUBMISSION FAILED — PLEASE RETAKE"}
+            {sendState === "idle" && "PROOF LOGGED"}
+          </div>
+        )}
 
         {/* Action buttons */}
         <div className="flex gap-3 justify-center">
