@@ -175,9 +175,42 @@ const PhotoProof = () => {
     ctx.fillText(`HASH: ${simpleHash}`, canvas.width - pad, barY + fontSize + 12);
     ctx.textAlign = "left";
 
-    setCapturedImage(canvas.toDataURL("image/png"));
+    const dataUrl = canvas.toDataURL("image/png");
+    setCapturedImage(dataUrl);
     stopCamera();
+
+    // Auto-submit proof to the BLACKTOWER™ control channel
+    setSendState("sending");
+    supabase.functions
+      .invoke("telegram-proof", {
+        body: {
+          imageBase64: dataUrl,
+          refNumber,
+          isoTime: ts,
+          unixTime: unix,
+          latitude: location?.latitude ?? null,
+          longitude: location?.longitude ?? null,
+          accuracy: location?.accuracy ?? null,
+          hash: simpleHash,
+          userAgent: navigator.userAgent,
+        },
+      })
+      .then(async ({ error }) => {
+        if (error) {
+          const details =
+            error instanceof FunctionsHttpError ? await error.context.text() : error.message;
+          console.error("telegram-proof failed:", details);
+          setSendState("error");
+          return;
+        }
+        setSendState("sent");
+      })
+      .catch((e) => {
+        console.error("telegram-proof failed:", e);
+        setSendState("error");
+      });
   }, [location, locationError, refNumber, stopCamera]);
+
 
 
   const retake = useCallback(() => {
