@@ -1,17 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Camera, RefreshCw, MapPin, Clock, Hash, X, FlipHorizontal, User, Smartphone } from "lucide-react";
+import { Camera, RefreshCw, MapPin, Clock, Hash, X, FlipHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { FunctionsHttpError } from "@supabase/supabase-js";
-import {
-  OPERATORS,
-  detectOperator,
-  rememberOperator,
-  deviceName,
-  reverseGeocode,
-  type Operator,
-} from "@/lib/tracelock";
 
 interface LocationData {
   latitude: number;
@@ -37,29 +29,11 @@ const PhotoProof = () => {
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [location, setLocation] = useState<LocationData | null>(null);
-  const [placeName, setPlaceName] = useState<string | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [refNumber, setRefNumber] = useState(generateRefNumber());
   const [currentTime, setCurrentTime] = useState(new Date());
   const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
   const [sendState, setSendState] = useState<"idle" | "sending" | "sent" | "error">("idle");
-  const [trust, setTrust] = useState<{ level: string; score: number } | null>(null);
-
-  const [operator, setOperator] = useState<Operator | null>(null);
-  const [identitySource, setIdentitySource] = useState("UNIDENTIFIED");
-  const [device] = useState(() => deviceName());
-
-  useEffect(() => {
-    const detected = detectOperator();
-    setOperator(detected.operator);
-    setIdentitySource(detected.source);
-  }, []);
-
-  const chooseOperator = useCallback((op: Operator) => {
-    rememberOperator(op.telegramId);
-    setOperator(op);
-    setIdentitySource("DEVICE MEMORY");
-  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -76,7 +50,6 @@ const PhotoProof = () => {
             accuracy: pos.coords.accuracy,
           });
           setLocationError(null);
-          reverseGeocode(pos.coords.latitude, pos.coords.longitude).then(setPlaceName);
         },
         (err) => setLocationError(err.message),
         { enableHighAccuracy: true, timeout: 10000 }
@@ -144,60 +117,73 @@ const PhotoProof = () => {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    // Draw video frame
     ctx.drawImage(video, 0, 0);
 
-    const smallFont = Math.max(11, canvas.width * 0.0155);
-    const fontSize = Math.max(14, canvas.width * 0.021);
-    const lineGap = smallFont * 1.55;
-    const pad = canvas.width * 0.025;
-
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const localStamp = now.toLocaleString("en-GB", { hour12: false });
-    const ts = now.toISOString();
-    const unix = Math.floor(now.getTime() / 1000);
-    const hashInput = `${refNumber}|${ts}|${operator?.telegramId ?? "NA"}|${location?.latitude ?? 0}|${location?.longitude ?? 0}`;
-    const simpleHash = btoa(hashInput).slice(0, 20);
-
-    const lines: string[] = [
-      `REF   : ${refNumber}`,
-      `USER  : ${operator ? `${operator.name} (TG ${operator.telegramId})` : "UNIDENTIFIED OPERATOR"}`,
-      `LOCAL : ${localStamp} (${tz})`,
-      `UTC   : ${ts}  |  UNIX: ${unix}`,
-      location
-        ? `GPS   : ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)} (±${location.accuracy.toFixed(0)}m)`
-        : `GPS   : ${locationError || "UNAVAILABLE"}`,
-      `PLACE : ${(placeName || "Resolving / unavailable").slice(0, 90)}`,
-      `DEVICE: ${device}  |  CAM: ${facingMode === "user" ? "FRONT" : "REAR"}`,
-      `HASH  : ${simpleHash}  |  ID SRC: ${identitySource}`,
-    ];
-
-    const barH = fontSize * 1.6 + lines.length * lineGap + pad * 1.6;
+    // Overlay bar at bottom
+    const barH = canvas.height * 0.18;
     const barY = canvas.height - barH;
-    ctx.fillStyle = "rgba(0, 0, 0, 0.78)";
+    ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
     ctx.fillRect(0, barY, canvas.width, barH);
+
+    // Accent line
     ctx.fillStyle = "#00bfff";
     ctx.fillRect(0, barY, canvas.width, 3);
 
-    let textY = barY + pad * 0.6 + fontSize;
-    ctx.textAlign = "left";
-    ctx.font = `bold ${fontSize}px Orbitron, monospace`;
-    ctx.fillStyle = "#00bfff";
-    ctx.fillText("BLACKTOWER™ TRACELOCK", pad, textY);
+    const fontSize = Math.max(14, canvas.width * 0.022);
+    const smallFont = Math.max(11, canvas.width * 0.016);
+    const pad = canvas.width * 0.03;
+    let textY = barY + fontSize + 12;
 
+    // Brand
+    ctx.font = `bold ${fontSize * 1.1}px Orbitron, monospace`;
+    ctx.fillStyle = "#00bfff";
+    ctx.fillText("BLACKTOWER™ PROOF", pad, textY);
+
+    // Reference
+    textY += fontSize + 10;
+    ctx.font = `bold ${fontSize}px JetBrains Mono, monospace`;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(`REF: ${refNumber}`, pad, textY);
+
+    // Timestamp
+    textY += fontSize + 8;
     ctx.font = `${smallFont}px JetBrains Mono, monospace`;
-    for (const line of lines) {
-      textY += lineGap;
-      ctx.fillStyle = line.startsWith("USER") || line.startsWith("REF") ? "#ffffff" : "#cfd8dc";
-      if (line.startsWith("GPS") && !location) ctx.fillStyle = "#ff6666";
-      ctx.fillText(line, pad, textY);
+    ctx.fillStyle = "#cccccc";
+    const ts = now.toISOString();
+    const unix = Math.floor(now.getTime() / 1000);
+    ctx.fillText(`TIME: ${ts}`, pad, textY);
+    textY += smallFont + 6;
+    ctx.fillText(`UNIX: ${unix}`, pad, textY);
+
+    // Location
+    textY += smallFont + 6;
+    if (location) {
+      ctx.fillText(
+        `LOC: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)} (±${location.accuracy.toFixed(0)}m)`,
+        pad,
+        textY
+      );
+    } else {
+      ctx.fillStyle = "#ff6666";
+      ctx.fillText(`LOC: ${locationError || "Unavailable"}`, pad, textY);
     }
+
+    // Hash watermark (right side)
+    ctx.textAlign = "right";
+    ctx.font = `${smallFont * 0.9}px JetBrains Mono, monospace`;
+    ctx.fillStyle = "rgba(0, 191, 255, 0.5)";
+    const hashInput = `${refNumber}|${ts}|${location?.latitude ?? 0}|${location?.longitude ?? 0}`;
+    const simpleHash = btoa(hashInput).slice(0, 16);
+    ctx.fillText(`HASH: ${simpleHash}`, canvas.width - pad, barY + fontSize + 12);
+    ctx.textAlign = "left";
 
     const dataUrl = canvas.toDataURL("image/png");
     setCapturedImage(dataUrl);
     stopCamera();
 
+    // Auto-submit proof to the BLACKTOWER™ control channel
     setSendState("sending");
-    setTrust(null);
     supabase.functions
       .invoke("telegram-proof", {
         body: {
@@ -205,22 +191,14 @@ const PhotoProof = () => {
           refNumber,
           isoTime: ts,
           unixTime: unix,
-          localTime: localStamp,
-          timeZone: tz,
           latitude: location?.latitude ?? null,
           longitude: location?.longitude ?? null,
           accuracy: location?.accuracy ?? null,
-          placeName,
           hash: simpleHash,
           userAgent: navigator.userAgent,
-          deviceName: device,
-          camera: facingMode,
-          operatorId: operator?.telegramId ?? null,
-          operatorName: operator?.name ?? null,
-          identitySource,
         },
       })
-      .then(async ({ data, error }) => {
+      .then(async ({ error }) => {
         if (error) {
           const details =
             error instanceof FunctionsHttpError ? await error.context.text() : error.message;
@@ -228,25 +206,24 @@ const PhotoProof = () => {
           setSendState("error");
           return;
         }
-        const trustData = (data as { trust?: { level: string; score: number } } | null)?.trust;
-        if (trustData) setTrust(trustData);
         setSendState("sent");
       })
       .catch((e) => {
         console.error("telegram-proof failed:", e);
         setSendState("error");
       });
-  }, [location, locationError, placeName, refNumber, stopCamera, operator, identitySource, device, facingMode]);
+  }, [location, locationError, refNumber, stopCamera]);
+
+
 
   const retake = useCallback(() => {
     setCapturedImage(null);
     setSendState("idle");
-    setTrust(null);
     setRefNumber(generateRefNumber());
     startCamera();
   }, [startCamera]);
 
-  const formatTime = (d: Date) => d.toLocaleTimeString("en-GB", { hour12: false });
+  const formatTime = (d: Date) => d.toLocaleTimeString("en-US", { hour12: false });
   const formatDate = (d: Date) => d.toISOString().split("T")[0];
 
   return (
@@ -254,39 +231,12 @@ const PhotoProof = () => {
       <CardHeader className="pb-3">
         <CardTitle className="font-display text-sm tracking-widest text-primary flex items-center gap-2">
           <Camera className="w-4 h-4" />
-          TRACELOCK CAPTURE
+          LOCATION PROOF CAPTURE
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Operator identity */}
-        <div className="rounded-md border border-border bg-secondary/40 px-3 py-2 text-xs font-mono space-y-2">
-          <div className="flex items-center gap-2">
-            <User className="w-3.5 h-3.5 text-primary shrink-0" />
-            <span className="text-muted-foreground">OPERATOR</span>
-            <span className="text-foreground">
-              {operator ? `${operator.name} · TG ${operator.telegramId}` : "NOT IDENTIFIED"}
-            </span>
-            <span className="ml-auto text-muted-foreground">{identitySource}</span>
-          </div>
-          {(!operator || identitySource !== "TELEGRAM WEBAPP") && (
-            <div className="flex flex-wrap gap-2">
-              {OPERATORS.map((op) => (
-                <Button
-                  key={op.telegramId}
-                  size="sm"
-                  variant={operator?.telegramId === op.telegramId ? "default" : "outline"}
-                  className="h-7 text-[10px] font-mono"
-                  onClick={() => chooseOperator(op)}
-                >
-                  {op.name}
-                </Button>
-              ))}
-            </div>
-          )}
-        </div>
-
         {/* Info strip */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs font-mono">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono">
           <div className="flex items-center gap-2 bg-secondary/50 rounded-md px-3 py-2">
             <Clock className="w-3.5 h-3.5 text-primary shrink-0" />
             <div>
@@ -296,28 +246,20 @@ const PhotoProof = () => {
           </div>
           <div className="flex items-center gap-2 bg-secondary/50 rounded-md px-3 py-2">
             <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
-            <div className="min-w-0">
+            <div>
               <span className="text-muted-foreground">LOCATION</span>
-              <p className="text-foreground truncate">
-                {placeName ||
-                  (location
-                    ? `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`
-                    : locationError || "Acquiring...")}
+              <p className="text-foreground">
+                {location
+                  ? `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`
+                  : locationError || "Acquiring..."}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2 bg-secondary/50 rounded-md px-3 py-2">
-            <Smartphone className="w-3.5 h-3.5 text-primary shrink-0" />
-            <div className="min-w-0">
-              <span className="text-muted-foreground">DEVICE</span>
-              <p className="text-foreground truncate">{device}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 bg-secondary/50 rounded-md px-3 py-2">
             <Hash className="w-3.5 h-3.5 text-primary shrink-0" />
-            <div className="min-w-0">
+            <div>
               <span className="text-muted-foreground">REF #</span>
-              <p className="text-foreground truncate">{refNumber}</p>
+              <p className="text-foreground">{refNumber}</p>
             </div>
           </div>
         </div>
@@ -342,7 +284,7 @@ const PhotoProof = () => {
           />
 
           {capturedImage && (
-            <img src={capturedImage} alt="TRACELOCK proof capture" className="w-full h-full object-contain" />
+            <img src={capturedImage} alt="Captured proof" className="w-full h-full object-contain" />
           )}
 
           {isCameraActive && (
@@ -368,11 +310,10 @@ const PhotoProof = () => {
                 : "border-border text-muted-foreground bg-secondary/40"
             }`}
           >
-            {sendState === "sending" && "SUBMITTING TRACELOCK TO CONTROL CHANNEL..."}
-            {sendState === "sent" &&
-              `TRACELOCK SUBMITTED — ${refNumber}${trust ? ` · TRUST ${trust.level} (${trust.score}/100)` : ""}`}
+            {sendState === "sending" && "SUBMITTING PROOF TO CONTROL CHANNEL..."}
+            {sendState === "sent" && "PROOF SUBMITTED — RECORDED UNDER " + refNumber}
             {sendState === "error" && "SUBMISSION FAILED — PLEASE RETAKE"}
-            {sendState === "idle" && "TRACELOCK LOGGED"}
+            {sendState === "idle" && "PROOF LOGGED"}
           </div>
         )}
 
