@@ -14,16 +14,117 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
+      proof_records: {
+        Row: {
+          accuracy: number | null
+          anti_cheat_flags: string[]
+          anti_cheat_score: number
+          captured_at: string
+          created_at: string
+          device_info: string | null
+          hash: string | null
+          id: string
+          latitude: number | null
+          location_details: Json | null
+          location_name: string | null
+          longitude: number | null
+          ref_number: string
+          unix_time: number | null
+          user_id: string
+          verdict: string | null
+        }
+        Insert: {
+          accuracy?: number | null
+          anti_cheat_flags?: string[]
+          anti_cheat_score?: number
+          captured_at?: string
+          created_at?: string
+          device_info?: string | null
+          hash?: string | null
+          id?: string
+          latitude?: number | null
+          location_details?: Json | null
+          location_name?: string | null
+          longitude?: number | null
+          ref_number: string
+          unix_time?: number | null
+          user_id: string
+          verdict?: string | null
+        }
+        Update: {
+          accuracy?: number | null
+          anti_cheat_flags?: string[]
+          anti_cheat_score?: number
+          captured_at?: string
+          created_at?: string
+          device_info?: string | null
+          hash?: string | null
+          id?: string
+          latitude?: number | null
+          location_details?: Json | null
+          location_name?: string | null
+          longitude?: number | null
+          ref_number?: string
+          unix_time?: number | null
+          user_id?: string
+          verdict?: string | null
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "member"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +251,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "member"],
+    },
   },
 } as const
