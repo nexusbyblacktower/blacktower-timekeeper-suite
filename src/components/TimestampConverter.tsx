@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Copy, Check, ArrowRightLeft } from "lucide-react";
+import { useIntelligence } from "@/hooks/useIntelligence";
 
 const TimestampConverter = () => {
   const [unixInput, setUnixInput] = useState("");
@@ -7,6 +8,7 @@ const TimestampConverter = () => {
   const [result, setResult] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [mode, setMode] = useState<"toDate" | "toUnix">("toDate");
+  const { logToolInteraction } = useIntelligence();
 
   const convertToDate = () => {
     const num = Number(unixInput);
@@ -17,6 +19,7 @@ const TimestampConverter = () => {
     setResult(
       `${d.toISOString()}\n${d.toUTCString()}\n${d.toLocaleString()}\nUnix (s): ${Math.floor(ms / 1000)}\nUnix (ms): ${ms}`
     );
+    logToolInteraction("UNIX_TO_DATE_CONVERSION", "SYSTEM");
   };
 
   const convertToUnix = () => {
@@ -25,6 +28,7 @@ const TimestampConverter = () => {
     setResult(
       `Unix (s): ${Math.floor(d.getTime() / 1000)}\nUnix (ms): ${d.getTime()}\nISO: ${d.toISOString()}\nUTC: ${d.toUTCString()}`
     );
+    logToolInteraction("DATE_TO_UNIX_CONVERSION", "SYSTEM");
   };
 
   const copy = () => {
@@ -41,7 +45,7 @@ const TimestampConverter = () => {
         <h2 className="font-display text-sm tracking-widest text-primary uppercase">Converter</h2>
         <button
           onClick={() => { setMode(m => m === "toDate" ? "toUnix" : "toDate"); setResult(null); }}
-          className="flex items-center gap-1.5 text-xs font-display tracking-wider text-muted-foreground hover:text-primary transition-colors"
+          className="flex items-center gap-1.5 text-xs font-display tracking-wider text-muted-foreground hover:text-primary transition-colors whitespace-nowrap shrink-0"
         >
           <ArrowRightLeft size={14} />
           {mode === "toDate" ? "Unix → Date" : "Date → Unix"}
@@ -78,7 +82,7 @@ const TimestampConverter = () => {
 
       {result && (
         <div className="mt-4 bg-secondary rounded-md p-4 relative">
-          <pre className="font-mono text-sm text-foreground whitespace-pre-wrap">{result}</pre>
+          <pre className="font-mono tabular-nums text-sm text-foreground whitespace-pre-wrap">{result}</pre>
           <button onClick={copy} className="absolute top-3 right-3 text-muted-foreground hover:text-primary transition-colors">
             {copied ? <Check size={16} /> : <Copy size={16} />}
           </button>

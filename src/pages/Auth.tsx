@@ -1,17 +1,17 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, LogIn, ShieldCheck } from "lucide-react";
+import { Loader2, LogIn, ShieldCheck, Terminal } from "lucide-react";
 import logo from "@/assets/blacktower-logo.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, isSupabaseConfigured } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
 const Auth = () => {
   const navigate = useNavigate();
-  const { user, loading } = useAuth();
+  const { user, loading, enableLocalTerminalSession } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -25,15 +25,40 @@ const Auth = () => {
     e.preventDefault();
     setBusy(true);
     setError(null);
-    const { error: err } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
-      password,
-    });
-    setBusy(false);
-    if (err) {
-      setError(err.message);
+
+    if (!isSupabaseConfigured) {
+      enableLocalTerminalSession(email || "operator@blacktower.com", "Kelvin Ong");
+      setBusy(false);
+      navigate("/", { replace: true });
       return;
     }
+
+    try {
+      const { error: err } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      });
+      setBusy(false);
+      if (err) {
+        setError(err.message);
+        return;
+      }
+      navigate("/", { replace: true });
+    } catch (fetchErr) {
+      setBusy(false);
+      setError(
+        fetchErr instanceof Error
+          ? `${fetchErr.message} (Use Offline Forensic Terminal Mode if cloud connection is unreachable)`
+          : "Authentication request failed."
+      );
+    }
+  };
+
+  const enterOfflineTerminal = () => {
+    enableLocalTerminalSession(
+      email.trim() || "blackmasterong@blacktower.com",
+      "Kelvin Ong"
+    );
     navigate("/", { replace: true });
   };
 
@@ -100,6 +125,18 @@ const Auth = () => {
                 {busy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <LogIn className="w-4 h-4 mr-2" />}
                 ENTER TERMINAL
               </Button>
+
+              {(!isSupabaseConfigured || error) && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={enterOfflineTerminal}
+                  className="w-full font-display tracking-wider text-xs border-primary/40 text-primary hover:bg-primary/10"
+                >
+                  <Terminal className="w-4 h-4 mr-2" />
+                  LAUNCH LOCAL FORENSIC TERMINAL
+                </Button>
+              )}
             </form>
           </CardContent>
         </Card>

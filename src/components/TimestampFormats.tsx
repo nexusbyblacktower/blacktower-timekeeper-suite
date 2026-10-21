@@ -1,14 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Copy, Check } from "lucide-react";
+import { useSharedSecondClock } from "@/hooks/useTimeEngine";
+import { useIntelligence } from "@/hooks/useIntelligence";
 
 const TimestampFormats = () => {
-  const [now, setNow] = useState(new Date());
+  const now = useSharedSecondClock();
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
-
-  useEffect(() => {
-    const interval = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(interval);
-  }, []);
+  const { logToolInteraction } = useIntelligence();
 
   const formats = [
     { label: "Unix (s)", value: String(Math.floor(now.getTime() / 1000)) },
@@ -23,10 +21,11 @@ const TimestampFormats = () => {
     { label: "Locale (ja-JP)", value: now.toLocaleString("ja-JP") },
   ];
 
-  const copy = (value: string, idx: number) => {
+  const copy = (value: string, idx: number, label: string) => {
     navigator.clipboard.writeText(value);
     setCopiedIdx(idx);
     setTimeout(() => setCopiedIdx(null), 1200);
+    logToolInteraction(`FORMAT_COPY_${label}`, "SYSTEM");
   };
 
   return (
@@ -37,9 +36,9 @@ const TimestampFormats = () => {
           <div key={f.label} className="flex items-center justify-between bg-secondary rounded-md px-3 py-2 group">
             <div className="min-w-0">
               <span className="text-xs text-muted-foreground font-display tracking-wider mr-3">{f.label}</span>
-              <span className="font-mono text-sm text-foreground break-all">{f.value}</span>
+              <span className="font-mono tabular-nums text-sm text-foreground break-all">{f.value}</span>
             </div>
-            <button onClick={() => copy(f.value, i)} className="ml-2 flex-shrink-0 text-muted-foreground hover:text-primary transition-colors opacity-0 group-hover:opacity-100">
+            <button onClick={() => copy(f.value, i, f.label)} className="ml-2 flex-shrink-0 text-muted-foreground hover:text-primary transition-colors opacity-0 group-hover:opacity-100">
               {copiedIdx === i ? <Check size={14} /> : <Copy size={14} />}
             </button>
           </div>

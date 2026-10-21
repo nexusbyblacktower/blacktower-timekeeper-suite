@@ -1,0 +1,9 @@
+{
+  "name": "BLACKTOWER™ TIMEKEEPER SUITE",
+  "description": "AI-Native Temporal Intelligence & Forensic Time Operating System for precision timestamps, cryptographic photo proof verification, geospatial timelines, and context switching intelligence.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ],
+  "majorCapabilities": []
+}

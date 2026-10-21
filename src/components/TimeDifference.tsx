@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { useIntelligence } from "@/hooks/useIntelligence";
 
 const TimeDifference = () => {
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [result, setResult] = useState<string | null>(null);
+  const { logToolInteraction } = useIntelligence();
 
   const calculate = () => {
     const s = new Date(start);
@@ -23,6 +25,7 @@ const TimeDifference = () => {
     setResult(
       `${diffMs.toLocaleString()} milliseconds\n${seconds.toLocaleString()} seconds\n${minutes.toLocaleString()} minutes\n${hours.toLocaleString()} hours\n${days.toLocaleString()} days\n${years > 0 ? `${years} years, ${remainDays} days` : `${days} days`}`
     );
+    logToolInteraction("TIME_DELTA_CALCULATION", "SYSTEM");
   };
 
   const setNow = (setter: (v: string) => void) => {
@@ -63,7 +66,7 @@ const TimeDifference = () => {
       </div>
       {result && (
         <div className="mt-4 bg-secondary rounded-md p-4">
-          <pre className="font-mono text-sm text-foreground whitespace-pre-wrap">{result}</pre>
+          <pre className="font-mono tabular-nums text-sm text-foreground whitespace-pre-wrap">{result}</pre>
         </div>
       )}
     </div>

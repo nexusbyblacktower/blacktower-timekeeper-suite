@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useSharedSecondClock } from "@/hooks/useTimeEngine";
 
 const ZONES = [
   { label: "UTC", tz: "UTC" },
@@ -12,12 +12,7 @@ const ZONES = [
 ];
 
 const WorldClocks = () => {
-  const [now, setNow] = useState(new Date());
-
-  useEffect(() => {
-    const interval = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(interval);
-  }, []);
+  const now = useSharedSecondClock();
 
   return (
     <div className="rounded-lg bg-card border border-glow p-6 glow-cyan">
@@ -26,7 +21,7 @@ const WorldClocks = () => {
         {ZONES.map(z => (
           <div key={z.tz} className="bg-secondary rounded-md p-3">
             <div className="text-xs text-muted-foreground font-display tracking-wider">{z.label}</div>
-            <div className="font-mono text-sm text-foreground">
+            <div className="font-mono tabular-nums text-sm text-foreground">
               {now.toLocaleTimeString("en-US", { timeZone: z.tz, hour12: false })}
             </div>
             <div className="font-mono text-xs text-muted-foreground">
