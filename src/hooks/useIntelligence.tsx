@@ -7,7 +7,7 @@ import {
   useMemo,
   ReactNode,
 } from "react";
-import { supabase, isSupabaseConfigured } from "@/integrations/supabase/client";
+import { supabase, isSupabaseConfigured } from "@/lib/auth/client";
 import { useAuth } from "@/hooks/useAuth";
 import type {
   DeterministicTemporalMetrics,

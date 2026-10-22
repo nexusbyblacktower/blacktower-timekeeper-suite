@@ -1,17 +1,17 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, LogIn, ShieldCheck, Terminal } from "lucide-react";
+import { Loader2, LogIn, ShieldCheck } from "lucide-react";
 import logo from "@/assets/blacktower-logo.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { supabase, isSupabaseConfigured } from "@/integrations/supabase/client";
+import { supabase, isSupabaseConfigured, AUTH_CONFIGURATION_ERROR } from "@/lib/auth/client";
 import { useAuth } from "@/hooks/useAuth";
 
 const Auth = () => {
   const navigate = useNavigate();
-  const { user, loading, enableLocalTerminalSession } = useAuth();
+  const { user, loading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -27,9 +27,8 @@ const Auth = () => {
     setError(null);
 
     if (!isSupabaseConfigured) {
-      enableLocalTerminalSession(email || "operator@blacktower.com", "Kelvin Ong");
+      setError(AUTH_CONFIGURATION_ERROR);
       setBusy(false);
-      navigate("/", { replace: true });
       return;
     }
 
@@ -43,23 +42,16 @@ const Auth = () => {
         setError(err.message);
         return;
       }
-      navigate("/", { replace: true });
+      // The AuthProvider validates the user, protected roles and People binding
+      // before its user state permits navigation.
     } catch (fetchErr) {
       setBusy(false);
       setError(
         fetchErr instanceof Error
-          ? `${fetchErr.message} (Use Offline Forensic Terminal Mode if cloud connection is unreachable)`
+          ? fetchErr.message
           : "Authentication request failed."
       );
     }
-  };
-
-  const enterOfflineTerminal = () => {
-    enableLocalTerminalSession(
-      email.trim() || "blackmasterong@blacktower.com",
-      "Kelvin Ong"
-    );
-    navigate("/", { replace: true });
   };
 
   return (
@@ -85,7 +77,7 @@ const Auth = () => {
             <form onSubmit={submit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-xs font-mono tracking-widest text-muted-foreground">
-                  BLACKTOWER EMAIL
+                  INTERNAL LOGIN ID
                 </Label>
                 <Input
                   id="email"
@@ -95,7 +87,7 @@ const Auth = () => {
                   maxLength={255}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@blacktower.com"
+                  placeholder="kelvin@blacktower.internal"
                   className="font-mono"
                 />
               </div>
@@ -115,34 +107,23 @@ const Auth = () => {
                 />
               </div>
 
-              {error && (
+              {(error || !isSupabaseConfigured) && (
                 <p className="text-xs font-mono text-destructive border border-destructive/40 bg-destructive/5 rounded-md px-3 py-2">
-                  {error}
+                  {error || AUTH_CONFIGURATION_ERROR}
                 </p>
               )}
 
-              <Button type="submit" disabled={busy} className="w-full font-display tracking-wider text-xs glow-cyan-strong">
+              <Button type="submit" disabled={busy || !isSupabaseConfigured} className="w-full font-display tracking-wider text-xs glow-cyan-strong">
                 {busy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <LogIn className="w-4 h-4 mr-2" />}
                 ENTER TERMINAL
               </Button>
 
-              {(!isSupabaseConfigured || error) && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={enterOfflineTerminal}
-                  className="w-full font-display tracking-wider text-xs border-primary/40 text-primary hover:bg-primary/10"
-                >
-                  <Terminal className="w-4 h-4 mr-2" />
-                  LAUNCH LOCAL FORENSIC TERMINAL
-                </Button>
-              )}
             </form>
           </CardContent>
         </Card>
 
         <p className="text-[11px] text-center text-muted-foreground font-mono">
-          Accounts are issued by BLACKTOWER™ control. No public sign-up.
+          Internal identities are issued by BLACKTOWER™ control. Not mailboxes. No public sign-up.
         </p>
       </div>
     </div>

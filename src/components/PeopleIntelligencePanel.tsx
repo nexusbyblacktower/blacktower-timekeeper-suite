@@ -15,7 +15,6 @@ import {
   AlertTriangle,
   Eye,
   UserCheck,
-  Terminal,
   RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,7 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { supabase, isSupabaseConfigured } from "@/integrations/supabase/client";
+import { supabase, isSupabaseConfigured } from "@/lib/auth/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useIntelligence } from "@/hooks/useIntelligence";
 import type {
@@ -54,9 +53,6 @@ type PeopleSubTab =
   | "PARTNERS"
   | "INVESTIGATIONS"
   | "AUDIT_LOGS";
-
-const KELVIN_DEFAULT_UID = "00000000-0000-4000-8000-000000000001";
-const ZIXUAN_DEFAULT_UID = "00000000-0000-4000-8000-000000000002";
 
 const parseStringArray = (val: unknown): string[] => {
   if (Array.isArray(val)) return val.map((item) => String(item));
@@ -107,18 +103,9 @@ const normalizeDbPerson = (row: Record<string, unknown>): PersonProfile => ({
   archived_by: row.archived_by ? String(row.archived_by) : null,
 });
 
-// Persistent singleton guard store for deterministic local/fallback enforcement
-const singletonGuardStore = new PeopleSecurityGuardStore(
-  INITIAL_PEOPLE_PROFILES.map((p) => {
-    if (p.person_code === "PERSON-0001") return { ...p, auth_user_id: KELVIN_DEFAULT_UID };
-    if (p.person_code === "PERSON-0002") return { ...p, auth_user_id: ZIXUAN_DEFAULT_UID };
-    return { ...p, auth_user_id: null };
-  }),
-  INITIAL_PARTNER_PROFILES
-);
-
 const PeopleIntelligencePanel = () => {
-  const { user, fullName, roles, isAdmin, setLocalOperatorRoleAndIdentity } = useAuth();
+  const { user, fullName, roles, isAdmin, personCode } = useAuth();
+  const singletonGuardStore = useMemo(() => new PeopleSecurityGuardStore([], []), [user?.id]);
   const { logToolInteraction } = useIntelligence();
 
   const actor: ActorIdentity = useMemo(
@@ -201,53 +188,15 @@ const PeopleIntelligencePanel = () => {
     }
   }, [verifiedAdmin, subTab]);
 
-  // Synchronize guard store auth_user_id linkage with current operator when matching
-  useEffect(() => {
-    if (!user) return;
-    const emailLower = (user.email || "").toLowerCase();
-    if (
-      emailLower === "blackmasterong@blacktower.com" ||
-      emailLower === "kelvinong.private@outlook.my" ||
-      user.id === KELVIN_DEFAULT_UID
-    ) {
-      singletonGuardStore.linkAuthUser("PERSON-0001", user.id);
-    } else if (
-      emailLower === "lee.zixuan@blacktower.com" ||
-      user.id === ZIXUAN_DEFAULT_UID
-    ) {
-      singletonGuardStore.linkAuthUser("PERSON-0002", user.id);
-    }
-  }, [user]);
-
   const syncFromStoreAndSupabase = useCallback(async () => {
     if (!actor.userId) return;
 
-    // 1. Always enforce deterministic RLS filtering via PeopleSecurityGuardStore
-    const guardProfiles = singletonGuardStore.selectProfiles(actor);
-    setProfiles(guardProfiles);
-
-    if (verifiedAdmin) {
-      const intelRes = singletonGuardStore.selectInternalIntelligence(actor);
-      if (intelRes.ok) setIntelligenceNotes(intelRes.data);
-
-      const partnerRes = singletonGuardStore.selectPartners(actor);
-      if (partnerRes.ok) setPartners(partnerRes.data);
-
-      const invRes = singletonGuardStore.selectInvestigations(actor);
-      if (invRes.ok) setInvestigations(invRes.data);
-
-      const verRes = singletonGuardStore.selectProfileVersions(actor);
-      if (verRes.ok) setVersions(verRes.data);
-
-      const auditRes = singletonGuardStore.selectAuditLogs(actor);
-      if (auditRes.ok) setAuditLogs(auditRes.data);
-    } else {
+    setProfiles([]);
       setIntelligenceNotes([]);
       setPartners([]);
       setInvestigations([]);
       setVersions([]);
       setAuditLogs([]);
-    }
 
     // 2. If Supabase is configured, query real RLS-protected tables and merge
     if (isSupabaseConfigured) {
@@ -259,8 +208,8 @@ const PeopleIntelligencePanel = () => {
 
         if (!profErr && dbProfiles && dbProfiles.length > 0) {
           const normalized = dbProfiles
-            .map((r) => normalizeDbPerson(r as Record<string, unknown>))
-            .filter((p) => canReadPersonProfile(actor, p));
+            .map((r) => normalizeDbPerson({ ...r, auth_user_id: r.person_code === personCode ? actor.userId : null }))
+            .filter((p) => verifiedAdmin || p.person_code === personCode);
           if (normalized.length > 0) {
             setProfiles(normalized);
           }
@@ -320,10 +269,10 @@ const PeopleIntelligencePanel = () => {
           }
         }
       } catch {
-        // Retain deterministic guard store state on network error
+        // No fabricated People identity on database failure.
       }
     }
-  }, [actor, verifiedAdmin]);
+  }, [actor, verifiedAdmin, personCode]);
 
   useEffect(() => {
     syncFromStoreAndSupabase();
@@ -943,64 +892,6 @@ const PeopleIntelligencePanel = () => {
             </p>
           </div>
 
-          {/* Role & Identity Verification Switcher for Live RBAC Testing */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-mono text-muted-foreground mr-1 flex items-center gap-1">
-              <Terminal className="w-3 h-3 text-primary" /> RBAC VERIFICATION MODE:
-            </span>
-            <Button
-              type="button"
-              size="sm"
-              variant={verifiedAdmin && user?.id === KELVIN_DEFAULT_UID ? "default" : "outline"}
-              onClick={() => {
-                singletonGuardStore.linkAuthUser("PERSON-0001", KELVIN_DEFAULT_UID);
-                setLocalOperatorRoleAndIdentity({
-                  userId: KELVIN_DEFAULT_UID,
-                  email: "blackmasterong@blacktower.com",
-                  fullName: "Kelvin Ong",
-                  roles: ["admin", "member"],
-                });
-              }}
-              className="font-mono text-[11px] h-7 px-2.5"
-            >
-              PERSON-0001 (ADMIN)
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={!verifiedAdmin && user?.id === ZIXUAN_DEFAULT_UID ? "default" : "outline"}
-              onClick={() => {
-                singletonGuardStore.linkAuthUser("PERSON-0002", ZIXUAN_DEFAULT_UID);
-                setLocalOperatorRoleAndIdentity({
-                  userId: ZIXUAN_DEFAULT_UID,
-                  email: "lee.zixuan@blacktower.com",
-                  fullName: "Lee Zi Xuan",
-                  roles: ["member"],
-                });
-              }}
-              className="font-mono text-[11px] h-7 px-2.5"
-            >
-              PERSON-0002 (NORMAL USER)
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={!verifiedAdmin && user?.id === KELVIN_DEFAULT_UID ? "default" : "outline"}
-              onClick={() => {
-                singletonGuardStore.linkAuthUser("PERSON-0001", KELVIN_DEFAULT_UID);
-                setLocalOperatorRoleAndIdentity({
-                  userId: KELVIN_DEFAULT_UID,
-                  email: "blackmasterong@blacktower.com",
-                  fullName: "Kelvin Ong (No Admin Role)",
-                  roles: ["member"],
-                });
-              }}
-              className="font-mono text-[11px] h-7 px-2.5"
-              title="Proves Founder title & Access Level 10 do NOT grant Admin access without user_roles = 'admin'"
-            >
-              FOUNDER TITLE WITHOUT ADMIN ROLE
-            </Button>
-          </div>
         </CardContent>
       </Card>
 
