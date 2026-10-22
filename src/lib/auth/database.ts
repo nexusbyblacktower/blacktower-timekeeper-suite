@@ -2,7 +2,8 @@ import type { Database } from "@/integrations/supabase/types";
 import type { PersonProfile, InternalIntelligenceRecord, PartnerProfileRecord, InvestigationRecord, AccessAuditLogRecord, ProfileVersionRecord } from "@/lib/people/peopleTypes";
 import type { ObservableActivitySession } from "@/lib/context/contextSwitchingEngine";
 
-type Table<T> = { Row: T; Insert: Partial<T>; Update: Partial<T>; Relationships: [] };
+type Fields<T> = { [K in keyof T]: T[K] };
+type Table<T> = { Row: Fields<T>; Insert: Partial<Fields<T>>; Update: Partial<Fields<T>>; Relationships: [] };
 // Application-owned schema extension while the dedicated connection is pending.
 // This declares the existing migration contract; it does not provision tables.
 export type AuthDatabase = Omit<Database, "public"> & {
